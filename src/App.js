@@ -3,7 +3,7 @@ import './App.css';
 import firebase from 'firebase';
 import "firebase/firestore";
 import React, { useEffect, useState, Component} from "react";
-
+import * as SockJS from 'sockjs-client';
 
 var styles = {
   fRow:{
@@ -42,12 +42,92 @@ var styles = {
   },
   header:{
     display: "flex",
-    flexDirection: "row",
+    flexDirection: "column",
     justifyContent: "flex-start",
     padding: "5px",
     width: '100%',
     background: "#3f0e40",
     color: "white"
+  },
+  body:{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-start",
+    width: "100%",
+    height: "85%",
+    overflow: "auto"
+  },
+  messageInboxSender:{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-start",
+    border: "1px solid #666",
+    background: "#d5f0c0",
+    padding: "0.3vw",
+    borderRadius: "2px"
+  },
+  messageInboxReciver:{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-start",
+    border: "1px solid #666",
+    background: "#ebe4dc",
+    padding: "0.3vw",
+    borderRadius: "2px"
+  },
+  messageInbox:{
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    width: "99%",
+    margin: "5px"
+  },
+  messageInboxReverse:{
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    width: "99%",
+    margin: "0.3vw"
+  },
+  message:{
+    display:"flex",
+    flexDirection: "column",
+    justifyContent: "flex-start",
+    width: "100%",
+    height: "10%",
+    padding: "0.4vw"
+  },
+  messageBox: {
+    display:"flex",
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    width: "99%",
+    height: "100%",
+    border: "1px solid #666",
+    borderRadius: "5px"
+  },
+  messageText:{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-start",
+    width: "85%",
+    height: "90%",
+    border: "none",
+    outline: "none",
+    margin: "0.3vw",
+  },
+  messageSend:{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-start",
+    width: "10%",
+    height: "100%",
+    border: "none",
+    background: "white",
+    cursor: "pointer"
+  },
+  author:{
+    fontWeight: "bold"
   }
 }
 
@@ -67,68 +147,108 @@ firebase.analytics();
 firebase.database();
 const db = firebase.firestore();
 
-class App extends Component {
-  constructor(){
-    super();
-    this.state ={
-      Id: "",
-    }
-  }
-
-  render() {
-    const room = {Id : ""};
+const App = ()=> {
+  const [currentRoomId, setCurrentRoomId] = useState(null);
 
     return (
       <div style={styles.fRow}>
-        <Rooms room={room}/>
-        <ChatRoom room={room}/>
+        <Rooms setCurrentRoomId={setCurrentRoomId} />
+        <ChatRoom currentRoomId={currentRoomId}/>
       </div>
     );
   }
-}
 
-function Rooms(parentRoom) {
+
+function Rooms({setCurrentRoomId}) {
   const [rooms,setRooms]= useState([])
   const fetchRooms=async()=>{
       const response= db.collection('Rooms');
       const data=await response.get();
       data.docs.forEach(item=>{ 
-        console.log(item.data());
-        setRooms([rooms,item.data()])
+        setRooms(oldRooms => [...oldRooms, [item.id,item.data()]]);
       })
 
-      console.log(parentRoom.room.id + "<-- ID ");
   }
   
   useEffect(() => {
     fetchRooms();
   }, [])
-
-
   return (
+    
     <details style={styles.sidePanel}>
       <summary style={styles.mL10}>Salas</summary>
       {
         rooms && rooms.map(room=>{
           return(
-            <span style={styles.mL5} onClick={() => {parentRoom.room.id = room.title;}}>{room.title}</span>
+            <span style={styles.mL5} onClick={() => {setCurrentRoomId(room[0])}}>{room[1].title}</span>
           )
         })
       }
     </details>
+    
   );
 }
 
-function ChatRoom(room){
+function ChatRoom(roomId){
+
+  const [messages,setMessages]= useState([])
+  const fetchMessages=async(roomId)=>{
+      const response= db.collection('Rooms').doc(roomId).collection("messages");
+      const data=await response.get();
+      data.docs.forEach(item=>{ 
+        setMessages(oldMessages => [...oldMessages, [item.id,item.data()]]);
+      })
+
+  }
 
   useEffect(() => {
-    if(room.room.Id != "") console.log(room.room.Id);
-  }, [room])
+    if(roomId.currentRoomId){
+      setMessages([]);
+      db.collection("Rooms").doc(roomId.currentRoomId).get().then(doc => {
+        let data = doc.data();
+        document.getElementById("roomTitle").innerText = data.title;
+        document.getElementById("roomHeader").innerText = data.header;
+        fetchMessages(roomId.currentRoomId);
+      });
+    }
+  }, [roomId])
+
+  const saveMessage = () => {
+    if(roomId.currentRoomId) {
+      
+      db.collection("Rooms").doc(roomId.currentRoomId).collection("messages").add({
+        author : "Yo",
+        message : document.getElementById("messageText").value,
+        timestamp: new Date().getTime()
+      })
+    }
+  }
 
   return(
     <div style={styles.chatRoom}>
       <div style={styles.header}>
-        <span>Aqui va la cabecera del chat</span>
+        <span id="roomTitle" style={styles.author}>No se ha seleccionado una sala</span>
+        <span>#<span id="roomHeader">No se ha seleccionado una sala</span></span>
+      </div>
+      <div id="messageArray" style={styles.body}>
+        {
+          messages && messages.map(message=>{
+            return(
+              <div style={(message[1].author != "Yo") ? styles.messageInbox: styles.messageInboxReverse}>
+                <div style={(message[1].author != "Yo") ? styles.messageInboxReciver: styles.messageInboxSender}>
+                  <span style={styles.author}>{message[1].author}</span>  
+                  <span>{message[1].message}</span>
+                </div>
+              </div>
+            )
+          })
+        }
+      </div>
+      <div style={styles.message}>
+        <div style={styles.messageBox}>
+          <textarea id="messageText" style={styles.messageText} placeholder= "Aqui va texto"></textarea>
+          <button onClick={saveMessage}style={styles.messageSend}>send</button>
+        </div>
       </div>
     </div>
   )
