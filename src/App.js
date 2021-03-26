@@ -147,6 +147,10 @@ firebase.analytics();
 firebase.database();
 const db = firebase.firestore();
 
+export function mySocketFactory() {
+  return new SockJS('http://127.0.0.1:3000/stomp');
+}
+
 const App = ()=> {
   const [currentRoomId, setCurrentRoomId] = useState(null);
 
@@ -193,7 +197,7 @@ function ChatRoom(roomId){
 
   const [messages,setMessages]= useState([])
   const fetchMessages=async(roomId)=>{
-      const response= db.collection('Rooms').doc(roomId).collection("messages");
+      const response= db.collection('Rooms').doc(roomId).collection("messages").orderBy("timestamp", "asc");
       const data=await response.get();
       data.docs.forEach(item=>{ 
         setMessages(oldMessages => [...oldMessages, [item.id,item.data()]]);
