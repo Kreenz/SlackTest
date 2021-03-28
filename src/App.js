@@ -3,9 +3,15 @@ import './App.css';
 import firebase from 'firebase';
 import "firebase/firestore";
 import React, { useEffect, useState, Component} from "react";
+import {
+  BrowserRouter as Router,
+  Switch,
+  Route,
+  Link
+} from "react-router-dom";
 import * as SockJS from 'sockjs-client';
 
-var styles = {
+const styles = {
   fRow:{
     display: 'flex',
     flexDirection: 'row',
@@ -56,6 +62,13 @@ var styles = {
     width: "100%",
     height: "85%",
     overflow: "auto"
+  },
+  bodyApp:{
+    position: "absolute",
+    width: "100%",
+    height:"100%",
+    top:"0",
+    left:"0"
   },
   messageInboxSender:{
     display: "flex",
@@ -128,6 +141,19 @@ var styles = {
   },
   author:{
     fontWeight: "bold"
+  },
+  nav:{
+    display:"flex",
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    height: "40px",
+    background: "#350d36",
+    borderBottom: "1px solid white"
+  },
+  navItem:{
+    marginLeft:"10px",
+    color: "white"
   }
 }
 
@@ -149,15 +175,55 @@ const db = firebase.firestore();
 
 const App = ()=> {
   const [currentRoomId, setCurrentRoomId] = useState(null);
+  const [loggedIn, setLoggedIn] = useState(false);
+
 
     return (
-      <div style={styles.fRow}>
-        <Rooms setCurrentRoomId={setCurrentRoomId} />
-        <ChatRoom currentRoomId={currentRoomId}/>
+      <Router>
+      <div style={styles.bodyApp}>
+        <nav style={styles.nav}>
+          <Link style={styles.navItem} to="/">Home</Link>
+          <Link style={styles.navItem} to="/register">Register</Link>    
+        </nav>
+
+        {/* A <Switch> looks through its children <Route>s and
+            renders the first one that matches the current URL. */}
+        <Switch>
+          <Route path="/register">
+            <Register setLoggedIn={setLoggedIn}/>
+          </Route>
+          <Route path="/">
+            {(loggedIn) ? <Main setCurrentRoomId={setCurrentRoomId} currentRoomId={currentRoomId}/> : <LogIn setLoggedIn={setLoggedIn}/>}
+          <LogIn/>
+          </Route>
+        </Switch>
       </div>
+    </Router>
     );
   }
 
+function LogIn(){
+  return (
+    <div></div>
+  )
+}
+
+function Register(){
+  return (
+    <div style={styles.register}>
+      
+    </div>
+  )
+}
+
+function Main(room){
+  return (
+    <div style={styles.fRow}>
+      <Rooms setCurrentRoomId={room.setCurrentRoomId} />
+      <ChatRoom currentRoomId={room.currentRoomId}/>
+    </div>
+  )
+}
 
 function Rooms({setCurrentRoomId}) {
   const [rooms,setRooms]= useState([])
