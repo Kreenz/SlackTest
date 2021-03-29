@@ -195,9 +195,9 @@ export function mySocketFactory() {
 const App = ()=> {
   const [currentRoomId, setCurrentRoomId] = useState(null);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [user, setUser] = useState("");
 
   useEffect(() => {
-    console.log("hola?")
     return <Redirect to="/"/>
   }, [loggedIn])
 
@@ -213,10 +213,10 @@ const App = ()=> {
             renders the first one that matches the current URL. */}
         <Switch>
           <Route path="/register">
-            <Register setLoggedIn={setLoggedIn}/>
+            <Register setUser={setUser} setLoggedIn={setLoggedIn}/>
           </Route>
           <Route path="/">
-            {(loggedIn) ? <Main setCurrentRoomId={setCurrentRoomId} currentRoomId={currentRoomId}/> : <LogIn setLoggedIn={setLoggedIn}/>}
+            {(loggedIn) ? <Main user={user} setCurrentRoomId={setCurrentRoomId} currentRoomId={currentRoomId}/> : <LogIn setUser={setUser} setLoggedIn={setLoggedIn}/>}
           </Route>
         </Switch>
       </div>
@@ -233,6 +233,7 @@ function LogIn(props){
 
     firebase.auth().signInWithEmailAndPassword(email, password)
     .then((user) => {
+      props.setUser(user.user.email);
       props.setLoggedIn(true);
     })
   }
@@ -279,7 +280,7 @@ function Main(room){
   return (
     <div style={styles.fRow}>
       <Rooms setCurrentRoomId={room.setCurrentRoomId} />
-      <ChatRoom currentRoomId={room.currentRoomId}/>
+      <ChatRoom user={room.user} currentRoomId={room.currentRoomId}/>
     </div>
   )
 }
@@ -342,7 +343,7 @@ function ChatRoom(roomId){
     if(roomId.currentRoomId) {
       
       db.collection("Rooms").doc(roomId.currentRoomId).collection("messages").add({
-        author : "Yo",
+        author : roomId.user,
         message : document.getElementById("messageText").value,
         timestamp: new Date().getTime()
       })
@@ -359,8 +360,8 @@ function ChatRoom(roomId){
         {
           messages && messages.map(message=>{
             return(
-              <div style={(message[1].author != "Yo") ? styles.messageInbox: styles.messageInboxReverse}>
-                <div style={(message[1].author != "Yo") ? styles.messageInboxReciver: styles.messageInboxSender}>
+              <div style={(message[1].author != roomId.user) ? styles.messageInbox: styles.messageInboxReverse}>
+                <div style={(message[1].author != roomId.user) ? styles.messageInboxReciver: styles.messageInboxSender}>
                   <span style={styles.author}>{message[1].author}</span>  
                   <span>{message[1].message}</span>
                 </div>
