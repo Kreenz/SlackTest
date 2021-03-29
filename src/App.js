@@ -7,7 +7,8 @@ import {
   BrowserRouter as Router,
   Switch,
   Route,
-  Link
+  Link,
+  Redirect
 } from "react-router-dom";
 import * as SockJS from 'sockjs-client';
 
@@ -154,6 +155,20 @@ const styles = {
   navItem:{
     marginLeft:"10px",
     color: "white"
+  },
+  registerBody:{
+    minHeight: "calc(100% - 40px)",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  registerForm:{
+    height: "250px",
+    width: "250px",
+    background: "#666",
+    border:"1px solid black",
+    borderRadius: "5px"
   }
 }
 
@@ -181,6 +196,10 @@ const App = ()=> {
   const [currentRoomId, setCurrentRoomId] = useState(null);
   const [loggedIn, setLoggedIn] = useState(false);
 
+  useEffect(() => {
+    console.log("hola?")
+    return <Redirect to="/"/>
+  }, [loggedIn])
 
     return (
       <Router>
@@ -198,7 +217,6 @@ const App = ()=> {
           </Route>
           <Route path="/">
             {(loggedIn) ? <Main setCurrentRoomId={setCurrentRoomId} currentRoomId={currentRoomId}/> : <LogIn setLoggedIn={setLoggedIn}/>}
-          <LogIn/>
           </Route>
         </Switch>
       </div>
@@ -206,16 +224,53 @@ const App = ()=> {
     );
   }
 
-function LogIn(){
+
+function LogIn(props){
+  const loggIn = () => {
+    
+    let email = document.getElementById("email").value;
+    let password = document.getElementById("password").value;
+
+    firebase.auth().signInWithEmailAndPassword(email, password)
+    .then((user) => {
+      props.setLoggedIn(true);
+    })
+  }
   return (
-    <div></div>
+    <div style={styles.registerBody}>
+      <h1>LoggIn</h1>
+      <div style={styles.registerForm}>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="text" placeholder="email"/>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" placeholder="password"/>
+        <button onClick={loggIn}>Logearse</button>
+      </div>
+    </div>
   )
 }
 
-function Register(){
+function Register(props){
+  const register = () => {
+    let email = document.getElementById("email").value;
+    let password = document.getElementById("password").value;
+
+    firebase.auth().createUserWithEmailAndPassword(email, password)
+    .then((user) => {
+      props.setLoggedIn(true);
+    });
+  }
+
   return (
-    <div style={styles.register}>
-      
+    <div style={styles.registerBody}>
+      <h1>Registrarse</h1>
+      <div style={styles.registerForm}>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="text" placeholder="email"/>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" placeholder="password"/>
+        <button onClick={register}>Registrarse</button>
+      </div>
     </div>
   )
 }
