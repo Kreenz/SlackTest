@@ -354,14 +354,16 @@ function connect() {
   })
 }
 
-function subscribe(roomId){
+function subscribe(roomId, setMessages){
   stompClient.subscribe("/topic/to_master/" + roomId, (recieved) => {
     var recieved = JSON.parse(recieved.body);
-    let msg = recieved.parameters[0];
-    let author = recieved.parameters[1];
     //msg received
     console.log("append msg");
 
+    setMessages(oldMessages => [...oldMessages, [recieved.parameters[0],recieved.parameters[1]]]);
+    let objDiv = document.getElementById("messageArray");
+    objDiv.scrollTop = objDiv.scrollHeight;
+    /*
     let htmlString = ReactDOMServer.renderToStaticMarkup(
       <div style={(author != roomId.user) ? styles.messageInbox: styles.messageInboxReverse}>
       <div style={(author != roomId.user) ? styles.messageInboxReciver: styles.messageInboxSender}>
@@ -372,7 +374,7 @@ function subscribe(roomId){
 
     console.log(htmlString);
     let nodeElement = new DOMParser().parseFromString(htmlString, "text/xml");
-    document.getElementById("messageArray").appendChild(nodeElement.documentElement);
+    document.getElementById("messageArray").appendChild(nodeElement.documentElement);*/
   });
   stomp = stompClient;
 }
@@ -393,13 +395,17 @@ function ChatRoom(roomId){
     if(roomId.currentRoomId){
       setMessages([]);
       db.collection("Rooms").doc(roomId.currentRoomId).get().then(doc => {
-        subscribe(roomId.currentRoomId);
+        subscribe(roomId.currentRoomId, setMessages);
         console.log(stomp)
         let data = doc.data();
         document.getElementById("roomTitle").innerText = data.title;
         document.getElementById("roomHeader").innerText = data.header;
         fetchMessages(roomId.currentRoomId);
+        let objDiv = document.getElementById("messageArray");
+        objDiv.scrollTop = objDiv.scrollHeight;
       });
+
+      
     }
   }, [roomId])
 
@@ -411,10 +417,8 @@ function ChatRoom(roomId){
         message : document.getElementById("messageText").value,
         timestamp: new Date().getTime()
       }).then(data =>{
-
-        console.log(stomp);
-
-        
+        console.log("<-- datos")
+        console.log(data);
         stomp.send(
           "/app/to_master/" + roomId.currentRoomId,
           {},
@@ -422,7 +426,7 @@ function ChatRoom(roomId){
             id: roomId.user,
             alias: null,
             command: "send_message",
-            parameters: [document.getElementById("messageText").value, roomId.user],
+            parameters: [data.id, {author: roomId.user, message: document.getElementById("messageText").value, timestamp: new Date().getTime()}],
           })
         );
       })
