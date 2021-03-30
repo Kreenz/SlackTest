@@ -3,14 +3,18 @@ import './App.css';
 import firebase from 'firebase';
 import "firebase/firestore";
 import React, { useEffect, useState, Component} from "react";
+import ReactDOMServer from 'react-dom/server';
 import {
   BrowserRouter as Router,
   Switch,
   Route,
   Link,
-  Redirect
+  Redirect,
+  useHistory
 } from "react-router-dom";
-import * as SockJS from 'sockjs-client';
+import SockJS from "sockjs-client";
+import Stomp from "stompjs";
+
 
 const styles = {
   fRow:{
@@ -182,6 +186,16 @@ var firebaseConfig = {
   appId: "1:466005197003:web:e5a0b3ffe1ccb78d1cdb4e",
   measurementId: "G-007V9V65WZ"
 };
+
+var server = "https://websocket-hcbserver.herokuapp.com";
+var socket = new SockJS(server + "/iwine-websocket" , null, { transports: ['websocket']});
+
+var stompClient = Stomp.over(socket);
+var stomp = "";
+
+
+//InstanceId = sala Eaxkjw9GBJO7lfnPBHfF
+
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 firebase.analytics();
@@ -196,9 +210,13 @@ const App = ()=> {
   const [currentRoomId, setCurrentRoomId] = useState(null);
   const [loggedIn, setLoggedIn] = useState(false);
   const [user, setUser] = useState("");
-
+  let history = useHistory();
   useEffect(() => {
-    return <Redirect to="/"/>
+    console.log(history);
+    if(history) {
+      history.replace("/")
+      console.log("history")
+    };
   }, [loggedIn])
 
     return (
@@ -213,7 +231,7 @@ const App = ()=> {
             renders the first one that matches the current URL. */}
         <Switch>
           <Route path="/register">
-            <Register setUser={setUser} setLoggedIn={setLoggedIn}/>
+            {(loggedIn) ? <Main user={user} setCurrentRoomId={setCurrentRoomId} currentRoomId={currentRoomId}/> : <Register setUser={setUser} setLoggedIn={setLoggedIn}/>}
           </Route>
           <Route path="/">
             {(loggedIn) ? <Main user={user} setCurrentRoomId={setCurrentRoomId} currentRoomId={currentRoomId}/> : <LogIn setUser={setUser} setLoggedIn={setLoggedIn}/>}
@@ -259,6 +277,7 @@ function Register(props){
     firebase.auth().createUserWithEmailAndPassword(email, password)
     .then((user) => {
       props.setLoggedIn(true);
+      props.setUser(email);
     });
   }
 
@@ -315,6 +334,49 @@ function Rooms({setCurrentRoomId}) {
   );
 }
 
+connect();
+
+function connect() {
+  return new Promise(resolve => {
+    stompClient.connect(
+      {},
+      () => {
+        console.log("<-- subscribe");
+        resolve(true);
+       //stomp to send
+      },
+      (e) => {
+        console.log("error");
+        resolve(false)
+      }
+    )
+    console.log(stompClient);
+  })
+}
+
+function subscribe(roomId){
+  stompClient.subscribe("/topic/to_master/" + roomId, (recieved) => {
+    var recieved = JSON.parse(recieved.body);
+    let msg = recieved.parameters[0];
+    let author = recieved.parameters[1];
+    //msg received
+    console.log("append msg");
+
+    let htmlString = ReactDOMServer.renderToStaticMarkup(
+      <div style={(author != roomId.user) ? styles.messageInbox: styles.messageInboxReverse}>
+      <div style={(author != roomId.user) ? styles.messageInboxReciver: styles.messageInboxSender}>
+        <span style={styles.author}>{author}</span>  
+        <span>{msg}</span>
+      </div>
+    </div>)
+
+    console.log(htmlString);
+    let nodeElement = new DOMParser().parseFromString(htmlString, "text/xml");
+    document.getElementById("messageArray").appendChild(nodeElement.documentElement);
+  });
+  stomp = stompClient;
+}
+
 function ChatRoom(roomId){
 
   const [messages,setMessages]= useState([])
@@ -331,6 +393,8 @@ function ChatRoom(roomId){
     if(roomId.currentRoomId){
       setMessages([]);
       db.collection("Rooms").doc(roomId.currentRoomId).get().then(doc => {
+        subscribe(roomId.currentRoomId);
+        console.log(stomp)
         let data = doc.data();
         document.getElementById("roomTitle").innerText = data.title;
         document.getElementById("roomHeader").innerText = data.header;
@@ -346,6 +410,21 @@ function ChatRoom(roomId){
         author : roomId.user,
         message : document.getElementById("messageText").value,
         timestamp: new Date().getTime()
+      }).then(data =>{
+
+        console.log(stomp);
+
+        
+        stomp.send(
+          "/app/to_master/" + roomId.currentRoomId,
+          {},
+          JSON.stringify({
+            id: roomId.user,
+            alias: null,
+            command: "send_message",
+            parameters: [document.getElementById("messageText").value, roomId.user],
+          })
+        );
       })
     }
   }
